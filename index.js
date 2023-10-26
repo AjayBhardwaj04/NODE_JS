@@ -3,6 +3,7 @@ import path from "path";
 import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
+import { log } from "console";
 
 const app = express();
 const users = [];
@@ -19,18 +20,19 @@ mongoose
 const userSchema = mongoose.Schema({
   name: String,
   email: String,
+  password: String,
 });
-// Defanded schema
+// Defaind schema
 const User = mongoose.model("User", userSchema);
 
-// Usind all Meddlewares
+// Using all Meddlewares
 app.use(express.static(path.join(path.resolve(), "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.set("view engine", "ejs");
-// Atuthenticarecn function 
-const isAuthenticated = async(req, res, next) => {
+// Atuthenticarecn function
+const isAuthenticated = async (req, res, next) => {
   const { token } = req.cookies;
   if (token) {
     const decoded = jwt.verify(token, "wed2342sadsadf");
@@ -38,13 +40,39 @@ const isAuthenticated = async(req, res, next) => {
     // console.log(decoded);
     next();
   } else {
-    res.render("login");
+    res.redirect("/login");
   }
 };
 
 app.get("/", isAuthenticated, (req, res) => {
   // console.log(req.user);
-  res.render("logout",{name:req.user.name});
+  res.render("logout", { name: req.user.name });
+});
+
+app.get("/register", (req, res) => {
+  res.render("register");
+});
+
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+
+app.post("/register", async (req, res) => {
+    const { name, email, password } = req.body;
+
+  let user = await User.findOne({ email });
+
+  if (user) {
+    return res.redirect("/logout");
+  }
+  user = await User.create({ name, email, password });
+
+  const token = jwt.sign({ _id: user._id }, "wed2342sadsadf");
+  res.cookie("token", token, {
+    httpOnly: true,
+    expires: new Date(Date.now() + 60 * 1000),
+  });
+  res.redirect("/");
 });
 
 app.get(
@@ -65,10 +93,14 @@ app.get(
 
 // Login  Authentication
 app.post("/login", async (req, res) => {
-  const { name, email } = req.body;
-  const user = await User.create({ name, email });
+  const { name, email, password } = req.body;
+  let user = await User.findOne({ email });
+  if (!user) {
+    return res.redirect("/register");
+    // return console.log("Register");
+  }
+  user = await User.create({ name, email, password });
   const token = jwt.sign({ _id: user._id }, "wed2342sadsadf");
-  // console.log(token);
   res.cookie("token", token, {
     httpOnly: true,
     expires: new Date(Date.now() + 60 * 1000),
