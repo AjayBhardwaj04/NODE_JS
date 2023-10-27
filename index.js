@@ -3,7 +3,7 @@ import path from "path";
 import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
-import { log } from "console";
+import bcrypt from "bcrypt";
 
 const app = express();
 const users = [];
@@ -44,28 +44,13 @@ const isAuthenticated = async (req, res, next) => {
   }
 };
 
-app.get("/", isAuthenticated, (req, res) => {
-  // console.log(req.user);
-  res.render("logout", { name: req.user.name });
-});
-
-app.get("/register", (req, res) => {
-  res.render("register");
-});
-
-app.get("/login", (req, res) => {
-  res.render("login");
-});
-
-app.post("/register", async (req, res) => {
-    const { name, email, password } = req.body;
-
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
   let user = await User.findOne({ email });
-
-  if (user) {
-    return res.redirect("/logout");
-  }
-  user = await User.create({ name, email, password });
+  if (!user) return res.redirect("/register");
+  const isMatche = await bcrypt.compare(password,user.password)
+  if (!isMatche)
+    return res.render("login", {email, messeage: "Incorrect Password " });
 
   const token = jwt.sign({ _id: user._id }, "wed2342sadsadf");
   res.cookie("token", token, {
@@ -75,21 +60,24 @@ app.post("/register", async (req, res) => {
   res.redirect("/");
 });
 
-app.get(
-  "/",
-  (req, res, next) => {
-    const { token } = req.cookies;
+app.post("/register", async (req, res) => {
+  const { name, email, password } = req.body;
 
-    if (token) {
-      next();
-    } else {
-      res.render("login");
-    }
-  },
-  (req, res) => {
-    res.render("index");
+  let user = await User.findOne({ email });
+
+  if (user) {
+    return res.redirect("/logout");
   }
-);
+  const hashedPassword = await bcrypt.hash(password,10);
+  user = await User.create({ name, email, password:hashedPassword, });
+
+  const token = jwt.sign({ _id: user._id }, "wed2342sadsadf");
+  res.cookie("token", token, {
+    httpOnly: true,
+    expires: new Date(Date.now() + 60 * 1000),
+  });
+  res.redirect("/");
+});
 
 // Login  Authentication
 app.post("/login", async (req, res) => {
@@ -109,6 +97,36 @@ app.post("/login", async (req, res) => {
   res.redirect("/");
 });
 
+
+
+app.get("/", isAuthenticated, (req, res) => {
+  // console.log(req.user);
+  res.render("logout", { name: req.user.name });
+});
+
+app.get("/register", (req, res) => {
+  res.render("register");
+});
+
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+
+app.get(
+  "/",
+  (req, res, next) => {
+    const { token } = req.cookies;
+    if (token) {
+      next();
+    } else {
+      res.render("login");
+    }
+  },
+  (req, res) => {
+    res.render("index");
+  }
+);
+
 // Logout Authentication
 app.get("/logout", (req, res) => {
   res.cookie("token", null, {
@@ -116,13 +134,6 @@ app.get("/logout", (req, res) => {
     expires: new Date(Date.now()),
   });
   res.redirect("/");
-});
-
-// Add data in DataBase using schema
-app.get("/add", async (req, res) => {
-  const { name, email } = req.body;
-  await User.create({ name, email });
-  // res.send("Good !");
 });
 
 app.listen(4000, () => {
