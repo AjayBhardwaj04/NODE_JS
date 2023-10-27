@@ -53,7 +53,8 @@
   
   .error {
     color: red;
-    font-size: 0.7rem;
+    font-size: 1rem;
+    font-weight: bolder;
     text-align: right;
     margin: 1rem;
   }
